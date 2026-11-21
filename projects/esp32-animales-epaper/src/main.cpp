@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <esp_sleep.h>
+#include <driver/rtc_io.h>
 #ifdef ENABLE_SD_FALLBACK
 #include <SD.h>
 #include <SPI.h>
@@ -72,9 +73,11 @@ static void enterDeepSleep(bool drawSleepMsg) {
         epd.drawSleepScreen();
         epd.displayFull();
         vTaskDelay(pdMS_TO_TICKS(1800));
-        epd.drawCoverScreen();
-        epd.displayFull();
     }
+    // Siempre dejar fija la portada ilustrada al dormir (manual o por inactividad)
+    // para que nunca parezca "congelado" en el ultimo animal.
+    epd.drawCoverScreen();
+    epd.displayFull();
 
     epd.sleep();
     audio.powerOff();
@@ -95,9 +98,20 @@ static void enterDeepSleep(bool drawSleepMsg) {
     digitalWrite(PIN_EPD_PWR, EPD_PWR_OFF);
     digitalWrite(PIN_MAIN_PWR, MAIN_PWR_OFF);
 
-    // Despertar con BOOT (GPIO 0), PWR (GPIO 18) o timer de check-in OTA
+    // Mantener pull-up RTC en BOOT (y PWR si esta HIGH) para despertar de forma confiable
+    rtc_gpio_init((gpio_num_t)PIN_BTN_BOOT);
+    rtc_gpio_set_direction((gpio_num_t)PIN_BTN_BOOT, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en((gpio_num_t)PIN_BTN_BOOT);
+    rtc_gpio_pulldown_dis((gpio_num_t)PIN_BTN_BOOT);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_BTN_BOOT, 0);
-    esp_sleep_enable_ext1_wakeup((1ULL << PIN_BTN_PWR), ESP_EXT1_WAKEUP_ANY_LOW);
+
+    if (digitalRead(PIN_BTN_PWR) == HIGH) {
+        rtc_gpio_init((gpio_num_t)PIN_BTN_PWR);
+        rtc_gpio_set_direction((gpio_num_t)PIN_BTN_PWR, RTC_GPIO_MODE_INPUT_ONLY);
+        rtc_gpio_pullup_en((gpio_num_t)PIN_BTN_PWR);
+        rtc_gpio_pulldown_dis((gpio_num_t)PIN_BTN_PWR);
+        esp_sleep_enable_ext1_wakeup((1ULL << PIN_BTN_PWR), ESP_EXT1_WAKEUP_ANY_LOW);
+    }
 
     uint16_t nextMin = otaGetNextCheckinMinutes();
     if (nextMin > 0) {
@@ -338,6 +352,9 @@ static void taskDisplay(void *pvParameters) {
 }
 
 void setup() {
+    rtc_gpio_deinit((gpio_num_t)PIN_BTN_BOOT);
+    rtc_gpio_deinit((gpio_num_t)PIN_BTN_PWR);
+
     // 1. Retener energia de bateria/perifericos
     pinMode(PIN_MAIN_PWR, OUTPUT);
     digitalWrite(PIN_MAIN_PWR, MAIN_PWR_ON);
