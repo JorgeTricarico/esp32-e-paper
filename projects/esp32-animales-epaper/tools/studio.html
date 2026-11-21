@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>Studio — Libro de Animales ESP32 e-Paper</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --ok: #22c55e;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: grid; grid-template-columns: 250px 1fr 400px; height: 100vh;
+  }
+  @media (max-width: 1040px) {
+    body { grid-template-columns: 1fr; height: auto; }
+  }
+  aside, main, section { padding: 16px; overflow-y: auto; border-right: 1px solid var(--border); }
+  section { border-right: none; }
+  h1, h2, h3 { margin: 0 0 10px; font-weight: 700; }
+  h2 { font-size: 15px; color: var(--accent); }
+  h3 { font-size: 14px; color: #e2e8f0; }
+  .animal-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; margin-bottom: 6px; border-radius: 8px;
+    background: var(--panel); border: 1px solid transparent; cursor: pointer;
+  }
+  .animal-item.active { border-color: var(--accent); background: #172554; }
+  .badge { font-size: 11px; padding: 2px 6px; border-radius: 99px; background: #334155; color: var(--muted); }
+  .badge.ok { background: #14532d; color: #86efac; }
+  .epd-sim {
+    width: 240px; height: 240px; margin: 12px auto;
+    background: #ffffff; color: #000000; border: 6px solid #475569; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 6px 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+  }
+  .epd-top { width: 100%; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; border-bottom: 1px solid #000; padding-bottom: 3px; }
+  .epd-sprite { width: 168px; height: 128px; image-rendering: pixelated; object-fit: contain; }
+  .epd-name { width: 100%; text-align: center; border-top: 1px solid #000; padding-top: 4px; font-size: 24px; font-weight: 900; letter-spacing: 3px; }
+  .epd-name span { display: inline-block; padding-bottom: 3px; border-bottom: 4px solid transparent; }
+  .epd-name span.active-letter { border-bottom-color: #000; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 12px 0; }
+  button {
+    background: #2563eb; color: #fff; border: none; border-radius: 8px;
+    padding: 8px 12px; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  button.secondary { background: #334155; }
+  button.ok { background: #16a34a; }
+  button.danger { background: var(--danger); }
+  button.purple { background: #7c3aed; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .status-bar {
+    text-align: center; font-size: 13px; color: var(--accent);
+    min-height: 20px; margin-bottom: 8px; font-weight: 600;
+  }
+  .card {
+    background: rgba(30, 41, 59, 0.55); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; margin-bottom: 14px;
+  }
+  .field { margin-bottom: 10px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  select, input, textarea {
+    width: 100%; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-family: inherit; font-size: 13px;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-row button { flex: 1; }
+  pre {
+    background: #020617; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; font-size: 11px; overflow-x: auto; max-height: 190px; margin-top: 8px;
+  }
+  .frames-row { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
+  .frame-card { background: #fff; color: #000; padding: 6px; border-radius: 8px; text-align: center; font-size: 11px; font-weight: 700; }
+  .frame-card img { display: block; width: 168px; height: 128px; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+  <aside>
+    <h2 id="listTitle">Personajes</h2>
+    <div id="animalList"></div>
+  </aside>
+
+  <main>
+    <h1 id="curTitle" style="text-align:center;">-</h1>
+    <div class="epd-sim">
+      <div class="epd-top">
+        <span id="spellBadge">A̶</span>
+        <span id="dotsBadge">1/15</span>
+        <span>[|||]</span>
+      </div>
+      <img id="epdSprite" class="epd-sprite" src="" alt="sprite" />
+      <div id="epdName" class="epd-name"></div>
+    </div>
+
+    <div id="playbackStatus" class="status-bar">Listo</div>
+
+    <div class="controls">
+      <button onclick="playSoundOnly()">1. Sonido Animal</button>
+      <button onclick="playLettersOnly()" class="ok">2. Letra por Letra</button>
+      <button onclick="playWordOnly()" class="purple">3. Lectura de Palabra</button>
+      <button onclick="playFullSpelling()" class="secondary">Todo Seguido</button>
+      <button onclick="toggleFrame()" class="secondary">Frame A / B</button>
+      <button onclick="stopAudio()" class="danger">Detener</button>
+    </div>
+
+    <div class="frames-row">
+      <div class="frame-card">Frame A (Reposo)<img id="imgA" alt="Frame A" /></div>
+      <div class="frame-card">Frame B (Acción)<img id="imgB" alt="Frame B" /></div>
+    </div>
+  </main>
+
+  <section>
+    <div class="card">
+      <h2>Configuración General (Para TODOS)</h2>
+      <div class="field">
+        <label>Fuente de Voz — Letras (única voz consistente)</label>
+        <select id="letterVoice" onchange="onGlobalChanged()"></select>
+      </div>
+      <div class="field">
+        <label>Variante de Pronunciación de Letras</label>
+        <select id="letterStyle" onchange="onGlobalChanged()"></select>
+      </div>
+      <div class="field">
+        <label>Velocidad de Letras: <span id="letterTempoVal">0.95</span>x</label>
+        <input type="range" id="letterTempo" min="0.65" max="1.25" step="0.05" value="0.95"
+               oninput="document.getElementById('letterTempoVal').textContent=parseFloat(this.value).toFixed(2); updateJson();" />
+      </div>
+      <div class="field">
+        <label>Pausa entre letras: <span id="pauseVal">140</span> ms</label>
+        <input type="range" id="letterPause" min="40" max="450" step="20" value="140"
+               oninput="document.getElementById('pauseVal').textContent=this.value; updateJson();" />
+      </div>
+      <hr style="border-color: var(--border); margin: 10px 0;" />
+      <div class="field">
+        <label>Fuente de Voz — Palabra Completa</label>
+        <select id="wordVoice" onchange="onGlobalChanged()"></select>
+      </div>
+      <div class="field">
+        <label>Velocidad de Palabra: <span id="tempoVal">0.84</span>x</label>
+        <input type="range" id="wordTempo" min="0.60" max="1.20" step="0.04" value="0.84"
+               oninput="document.getElementById('tempoVal').textContent=parseFloat(this.value).toFixed(2); updateJson();" />
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Ajustes (<span id="cfgAnimalName">-</span> o TODOS a la vez)</h3>
+      <div class="field">
+        <label>Estado</label>
+        <select id="animalStatus" onchange="saveAnimalNote()">
+          <option value="aprobado">Aprobado</option>
+          <option value="ajustar_dibujo">Ajustar dibujo / animación</option>
+          <option value="ajustar_sonido">Ajustar sonido</option>
+          <option value="ajustar_ambos">Ajustar dibujo y sonido</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Estilo de animación Frame B</label>
+        <select id="animStyle" onchange="saveAnimalNote()">
+          <option value="estandar">Estándar (actual)</option>
+          <option value="quieto_solo_boca">Quieto (solo boca/expresión)</option>
+          <option value="movimiento_suave">Movimiento suave</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Notas (opcional)</label>
+        <textarea id="animalNotes" oninput="saveAnimalNote()" placeholder="Notas puntuales..."></textarea>
+      </div>
+      <div class="btn-row">
+        <button id="applyAllBtn" class="ok" onclick="applyToAllAnimals()">Aplicar Estado y Estilo a TODOS (15)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Exportar JSON</h2>
+      <div class="btn-row">
+        <button id="copyAllBtn" onclick="copyAllJson()">Copiar JSON Completo (TODOS)</button>
+        <button id="copyOneBtn" class="secondary" onclick="copyOneJson()">Copiar Solo Este</button>
+      </div>
+      <pre id="jsonOut"></pre>
+    </div>
+  </section>
+
+<script>
+const STORAGE_KEY = "esp32_animales_studio_v3";
+let manifest = { animals: [], voices: [], styles: [] };
+let curIdx = 0;
+let showFrameB = false;
+let currentAudio = null;
+let currentAbort = null;
+let pendingResolve = null;
+let activeTimeouts = new Set();
+let playToken = 0;
+
+let state = {
+  global: {
+    letter_voice: "gtts_es_419",
+    letter_style: "natural",
+    letter_tempo: 0.95,
+    letter_pause_ms: 140,
+    word_voice: "gtts_es_419",
+    word_tempo: 0.84,
+  },
+  animals: {}
+};
+
+function setStatus(msg, isError = false) {
+  const el = document.getElementById("playbackStatus");
+  el.textContent = msg;
+  el.style.color = isError ? "#f87171" : "var(--accent)";
+}
+
+function sleepCancelable(ms, token) {
+  return new Promise((resolve) => {
+    if (token !== playToken) return resolve(false);
+    const tid = setTimeout(() => {
+      activeTimeouts.delete(tid);
+      resolve(token === playToken);
+    }, ms);
+    activeTimeouts.add(tid);
+  });
+}
+
+function stopAudio(resetMsg = true) {
+  playToken++;
+  if (currentAbort) {
+    currentAbort.abort();
+    currentAbort = null;
+  }
+  for (const tid of activeTimeouts) clearTimeout(tid);
+  activeTimeouts.clear();
+
+  if (currentAudio) {
+    currentAudio.onended = null;
+    currentAudio.onerror = null;
+    currentAudio.pause();
+    currentAudio.removeAttribute("src");
+    currentAudio = null;
+  }
+  if (pendingResolve) {
+    const res = pendingResolve;
+    pendingResolve = null;
+    res(false);
+  }
+  document.querySelectorAll(".epd-name span").forEach(s => s.classList.remove("active-letter"));
+  document.getElementById("spellBadge").textContent = "A̶";
+  showFrameB = false;
+  if (manifest.animals[curIdx]) {
+    document.getElementById("epdSprite").src = manifest.animals[curIdx].sprite_a;
+  }
+  if (resetMsg) setStatus("Listo");
+}
+
+async function playWav(url, token) {
+  if (token !== playToken) return false;
+  currentAbort = new AbortController();
+  let objUrl = null;
+  try {
+    setStatus("Cargando / Sintetizando...");
+    const resp = await fetch(url, { signal: currentAbort.signal, cache: "no-store" });
+    if (!resp.ok) {
+      let errMsg = `HTTP ${resp.status}`;
+      try { const j = await resp.json(); if (j.error) errMsg = j.error; } catch {}
+      setStatus(`Error: ${errMsg}`, true);
+      return false;
+    }
+    const blob = await resp.blob();
+    if (token !== playToken) return false;
+    objUrl = URL.createObjectURL(blob);
+
+    return await new Promise((resolve) => {
+      if (token !== playToken) { URL.revokeObjectURL(objUrl); return resolve(false); }
+      const audio = new Audio(objUrl);
+      currentAudio = audio;
+      pendingResolve = (ok) => {
+        URL.revokeObjectURL(objUrl);
+        resolve(ok);
+      };
+      audio.onended = () => {
+        const r = pendingResolve; pendingResolve = null; currentAudio = null;
+        if (r) r(token === playToken);
+      };
+      audio.onerror = () => {
+        const r = pendingResolve; pendingResolve = null; currentAudio = null;
+        if (r) r(false);
+      };
+      setStatus("Reproduciendo...");
+      audio.play().catch(() => {
+        const r = pendingResolve; pendingResolve = null; currentAudio = null;
+        if (r) r(false);
+      });
+    });
+  } catch (e) {
+    if (e.name !== "AbortError") setStatus(`Error de red: ${e.message}`, true);
+    return false;
+  } finally {
+    currentAbort = null;
+  }
+}
+
+async function init() {
+  try {
+    const res = await fetch("/api/manifest", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    manifest = await res.json();
+    if (!manifest.animals || manifest.animals.length === 0) throw new Error("Manifest vacío");
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (saved && saved.global) {
+        Object.assign(state.global, saved.global);
+        if (saved.animals) state.animals = saved.animals;
+      }
+    } catch {}
+
+    for (const id of ["letterVoice", "wordVoice"]) {
+      const sel = document.getElementById(id);
+      sel.innerHTML = "";
+      manifest.voices.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.id; opt.textContent = v.label;
+        sel.appendChild(opt);
+      });
+    }
+    const styleSel = document.getElementById("letterStyle");
+    styleSel.innerHTML = "";
+    (manifest.styles || []).forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id; opt.textContent = s.label;
+      styleSel.appendChild(opt);
+    });
+
+    if (manifest.voices.some(v => v.id === state.global.letter_voice)) {
+      document.getElementById("letterVoice").value = state.global.letter_voice;
+    }
+    if (manifest.voices.some(v => v.id === state.global.word_voice)) {
+      document.getElementById("wordVoice").value = state.global.word_voice;
+    }
+    if ((manifest.styles || []).some(s => s.id === state.global.letter_style)) {
+      styleSel.value = state.global.letter_style;
+    }
+    document.getElementById("letterTempo").value = state.global.letter_tempo;
+    document.getElementById("letterTempoVal").textContent = parseFloat(state.global.letter_tempo).toFixed(2);
+    document.getElementById("letterPause").value = state.global.letter_pause_ms;
+    document.getElementById("pauseVal").textContent = state.global.letter_pause_ms;
+    document.getElementById("wordTempo").value = state.global.word_tempo;
+    document.getElementById("tempoVal").textContent = parseFloat(state.global.word_tempo).toFixed(2);
+
+    manifest.animals.forEach(a => {
+      if (!state.animals[a.id]) {
+        state.animals[a.id] = { status: "aprobado", anim_style: "estandar", notes: "" };
+      }
+    });
+
+    document.getElementById("listTitle").textContent = `Personajes (${manifest.animals.length})`;
+    renderList();
+    selectAnimal(0);
+  } catch (e) {
+    setStatus(`Error cargando manifest: ${e.message}`, true);
+  }
+}
+
+function renderList() {
+  const list = document.getElementById("animalList");
+  list.innerHTML = "";
+  manifest.animals.forEach((a, i) => {
+    const cfg = state.animals[a.id];
+    const div = document.createElement("div");
+    div.className = "animal-item" + (i === curIdx ? " active" : "");
+    div.onclick = () => selectAnimal(i);
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = `${i + 1}. ${a.name}`;
+
+    const badge = document.createElement("span");
+    badge.className = "badge" + (cfg.status === "aprobado" ? " ok" : "");
+    badge.textContent = cfg.notes.trim() ? `${cfg.status} *` : cfg.status;
+
+    div.appendChild(nameSpan);
+    div.appendChild(badge);
+    list.appendChild(div);
+  });
+}
+
+function selectAnimal(i) {
+  if (!manifest.animals[i]) return;
+  stopAudio();
+  curIdx = i;
+  const a = manifest.animals[i];
+  document.getElementById("curTitle").textContent = a.name;
+  document.getElementById("cfgAnimalName").textContent = a.name;
+  document.getElementById("imgA").src = a.sprite_a;
+  document.getElementById("imgB").src = a.sprite_b;
+  document.getElementById("epdSprite").src = a.sprite_a;
+  document.getElementById("dotsBadge").textContent = `${i + 1}/${manifest.animals.length}`;
+
+  const nameDiv = document.getElementById("epdName");
+  nameDiv.innerHTML = "";
+  [...a.name].forEach((ch, idx) => {
+    const sp = document.createElement("span");
+    sp.id = `ltr_${idx}`;
+    sp.textContent = ch;
+    nameDiv.appendChild(sp);
+  });
+
+  const cfg = state.animals[a.id];
+  document.getElementById("animalStatus").value = cfg.status;
+  document.getElementById("animStyle").value = cfg.anim_style;
+  document.getElementById("animalNotes").value = cfg.notes;
+
+  renderList();
+  updateJson();
+}
+
+function toggleFrame() {
+  if (!manifest.animals[curIdx]) return;
+  showFrameB = !showFrameB;
+  const a = manifest.animals[curIdx];
+  document.getElementById("epdSprite").src = showFrameB ? a.sprite_b : a.sprite_a;
+}
+
+function onGlobalChanged() {
+  stopAudio();
+  updateJson();
+}
+
+async function playSoundOnly() {
+  stopAudio();
+  const token = playToken;
+  const a = manifest.animals[curIdx];
+  document.getElementById("epdSprite").src = a.sprite_b;
+  await playWav(a.sound, token);
+  if (token === playToken) {
+    document.getElementById("epdSprite").src = a.sprite_a;
+    setStatus("Listo");
+  }
+}
+
+async function playLettersOnly() {
+  stopAudio();
+  const token = playToken;
+  const a = manifest.animals[curIdx];
+  const pauseMs = parseInt(document.getElementById("letterPause").value, 10);
+  const voice = document.getElementById("letterVoice").value;
+  const style = document.getElementById("letterStyle").value;
+  const tempo = document.getElementById("letterTempo").value;
+  document.getElementById("spellBadge").textContent = "A";
+
+  for (let i = 0; i < a.letter_keys.length; i++) {
+    if (token !== playToken) return;
+    document.querySelectorAll(".epd-name span").forEach(s => s.classList.remove("active-letter"));
+    const el = document.getElementById("ltr_" + i);
+    if (el) el.classList.add("active-letter");
+    const url = `/api/audio?voice=${encodeURIComponent(voice)}&kind=letter&key=${encodeURIComponent(a.letter_keys[i])}&tempo=${encodeURIComponent(tempo)}&style=${encodeURIComponent(style)}`;
+    if (!(await playWav(url, token))) return;
+    if (el) el.classList.remove("active-letter");
+    if (!(await sleepCancelable(pauseMs, token))) return;
+  }
+  if (token === playToken) {
+    document.getElementById("spellBadge").textContent = "A̶";
+    setStatus("Listo");
+  }
+}
+
+async function playWordOnly() {
+  stopAudio();
+  const token = playToken;
+  const a = manifest.animals[curIdx];
+  const voice = document.getElementById("wordVoice").value;
+  const tempo = document.getElementById("wordTempo").value;
+  document.querySelectorAll(".epd-name span").forEach(s => s.classList.add("active-letter"));
+  const url = `/api/audio?voice=${encodeURIComponent(voice)}&kind=name&key=${encodeURIComponent(a.id)}&tempo=${encodeURIComponent(tempo)}`;
+  await playWav(url, token);
+  document.querySelectorAll(".epd-name span").forEach(s => s.classList.remove("active-letter"));
+  if (token === playToken) setStatus("Listo");
+}
+
+async function playFullSpelling() {
+  stopAudio();
+  const token = playToken;
+  const a = manifest.animals[curIdx];
+  const pauseMs = parseInt(document.getElementById("letterPause").value, 10);
+  const lVoice = document.getElementById("letterVoice").value;
+  const lStyle = document.getElementById("letterStyle").value;
+  const lTempo = document.getElementById("letterTempo").value;
+  const wVoice = document.getElementById("wordVoice").value;
+  const wTempo = document.getElementById("wordTempo").value;
+
+  document.getElementById("spellBadge").textContent = "A";
+  document.getElementById("epdSprite").src = a.sprite_b;
+  if (!(await playWav(a.sound, token))) return;
+  if (!(await sleepCancelable(220, token))) return;
+
+  for (let i = 0; i < a.letter_keys.length; i++) {
+    if (token !== playToken) return;
+    document.querySelectorAll(".epd-name span").forEach(s => s.classList.remove("active-letter"));
+    const el = document.getElementById("ltr_" + i);
+    if (el) el.classList.add("active-letter");
+    const lUrl = `/api/audio?voice=${encodeURIComponent(lVoice)}&kind=letter&key=${encodeURIComponent(a.letter_keys[i])}&tempo=${encodeURIComponent(lTempo)}&style=${encodeURIComponent(lStyle)}`;
+    if (!(await playWav(lUrl, token))) return;
+    if (el) el.classList.remove("active-letter");
+    if (!(await sleepCancelable(pauseMs, token))) return;
+  }
+  if (!(await sleepCancelable(140, token))) return;
+  document.querySelectorAll(".epd-name span").forEach(s => s.classList.add("active-letter"));
+  const wUrl = `/api/audio?voice=${encodeURIComponent(wVoice)}&kind=name&key=${encodeURIComponent(a.id)}&tempo=${encodeURIComponent(wTempo)}`;
+  if (!(await playWav(wUrl, token))) return;
+  document.querySelectorAll(".epd-name span").forEach(s => s.classList.remove("active-letter"));
+  if (!(await sleepCancelable(140, token))) return;
+  await playWav(a.sound, token);
+  if (token === playToken) {
+    document.getElementById("epdSprite").src = a.sprite_a;
+    document.getElementById("spellBadge").textContent = "A̶";
+    setStatus("Listo");
+  }
+}
+
+function saveAnimalNote() {
+  const a = manifest.animals[curIdx];
+  if (!a) return;
+  state.animals[a.id] = {
+    status: document.getElementById("animalStatus").value,
+    anim_style: document.getElementById("animStyle").value,
+    notes: document.getElementById("animalNotes").value,
+  };
+  renderList();
+  updateJson();
+}
+
+function applyToAllAnimals() {
+  const st = document.getElementById("animalStatus").value;
+  const anim = document.getElementById("animStyle").value;
+  manifest.animals.forEach(a => {
+    const prevNotes = (state.animals[a.id] && state.animals[a.id].notes) || "";
+    state.animals[a.id] = { status: st, anim_style: anim, notes: prevNotes };
+  });
+  renderList();
+  updateJson();
+  const btn = document.getElementById("applyAllBtn");
+  btn.textContent = "¡Aplicado a los 15!";
+  setTimeout(() => { btn.textContent = "Aplicar Estado y Estilo a TODOS (15)"; }, 1800);
+}
+
+function updateJson() {
+  state.global.letter_voice = document.getElementById("letterVoice").value;
+  state.global.letter_style = document.getElementById("letterStyle").value;
+  state.global.letter_tempo = parseFloat(document.getElementById("letterTempo").value);
+  state.global.letter_pause_ms = parseInt(document.getElementById("letterPause").value, 10);
+  state.global.word_voice = document.getElementById("wordVoice").value;
+  state.global.word_tempo = parseFloat(document.getElementById("wordTempo").value);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  document.getElementById("jsonOut").textContent = JSON.stringify(state, null, 2);
+}
+
+async function copyText(text, btnId, okLabel, origLabel) {
+  const btn = document.getElementById(btnId);
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  btn.textContent = okLabel;
+  setTimeout(() => { btn.textContent = origLabel; }, 1800);
+}
+
+function copyAllJson() {
+  copyText(JSON.stringify(state, null, 2), "copyAllBtn", "¡JSON Completo Copiado!", "Copiar JSON Completo (TODOS)");
+}
+
+function copyOneJson() {
+  const a = manifest.animals[curIdx];
+  if (!a) return;
+  const payload = {
+    global: state.global,
+    animal: { id: a.id, name: a.name, ...state.animals[a.id] }
+  };
+  copyText(JSON.stringify(payload, null, 2), "copyOneBtn", "¡Copiado!", "Copiar Solo Este");
+}
+
+init();
+</script>
+</body>
+</html>

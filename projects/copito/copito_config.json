@@ -1,0 +1,152 @@
+{
+  "project": {
+    "name": "Copito AI - Asistente Autonomo",
+    "version": "2.0.0",
+    "description": "Asistente de voz autonomo con pantalla de tinta electronica Waveshare 1.54, ESP32-S3 y Google Gemini AI",
+    "hardware": {
+      "board": "Waveshare ESP32-S3-ePaper-1.54",
+      "soc": "ESP32-S3-PICO-1-N8R8",
+      "flash_mb": 8,
+      "psram_mb": 8,
+      "psram_type": "OPI",
+      "com_port": "COM3",
+      "baud_rate": 115200
+    }
+  },
+  "wifi": {
+    "primary": {
+      "ssid": "TeleCentro-5618",
+      "pass": "RMZ5GDZKRDM3"
+    },
+    "secondary": {
+      "ssid": "Telecentro-d1fc",
+      "pass": "MMLNTJFTY2W5"
+    },
+    "rescue_ap": {
+      "ssid": "ESP32-Paper-Assistant",
+      "pass": "",
+      "ip": "192.168.4.1"
+    }
+  },
+  "ai": {
+    "provider": "Google Gemini (Direct HTTPS)",
+    "api_key": "YOUR_GEMINI_API_KEY",
+    "default_model": "gemini-3.5-flash-lite",
+    "fallback_model": "gemini-2.5-flash",
+    "temperature": 0.7,
+    "max_tokens": 300,
+    "system_prompt": "Eres Copito, un robot companero inteligente, calido, curioso y simpatico. Conversas con tu companero Jorge de forma natural, amena y amigable en espanol. Para saludos casuales responde de manera breve (1 o 2 oraciones), pero para preguntas explicativas o complejas brinda respuestas claras, completas y bien explicadas."
+  },
+  "tts": {
+    "provider": "ELEVENLABS",
+    "api_key": "",
+    "voice_id": "21m00Tcm4TlvDq8ikWAM",
+    "sample_rate": 16000,
+    "available_providers": [
+      {
+        "id": 0,
+        "name": "ElevenLabs (Ultra-natural)",
+        "sample_rate": 16000
+      },
+      {
+        "id": 1,
+        "name": "OpenAI TTS (tts-1 Nova)",
+        "sample_rate": 24000
+      },
+      {
+        "id": 2,
+        "name": "VoiceRSS (Direct REST)",
+        "sample_rate": 16000
+      }
+    ]
+  },
+  "audio": {
+    "sample_rate": 16000,
+    "volume": 85,
+    "mic_gain": 80,
+    "codec": "ES8311",
+    "amp": "NS4150B"
+  },
+  "features": {
+    "enable_top_statusbar": {
+      "active": true,
+      "description": "Indicadores en esquinas superiores: nivel de bateria a la derecha y barras WiFi RSSI a la izquierda"
+    },
+    "enable_borderless_canvas": {
+      "active": true,
+      "description": "Diseño estetico organico sin bordes cuadrados ni marcos molestos"
+    },
+    "remove_name_badge": {
+      "active": true,
+      "description": "Eliminar la insignia con el nombre Copito para una interfaz limpia y minimalista"
+    },
+    "enable_kawaii_glossy_eyes": {
+      "active": true,
+      "description": "Ojos anime detallados con brillos circulares y pestañeo organico"
+    },
+    "enable_fast_partial_refresh": {
+      "active": true,
+      "description": "Refresco parcial e-Paper ultra-rapido (<300ms) para animaciones fluidas sin parpadeo"
+    },
+    "enable_chunked_http_decoder": {
+      "active": true,
+      "description": "Decodificador transparente de paquetes HTTP Chunked de Google Gemini"
+    },
+    "enable_clean_tts_sanitizer": {
+      "active": true,
+      "description": "Filtro anti-markdown (*pensando*, emojis, citas) y normalizador de texto español"
+    },
+    "enable_rescue_ap_portal": {
+      "active": true,
+      "description": "Portal cautivo de rescate WiFi con pulsacion sostenida de BOOT (4s)"
+    },
+    "enable_serial_debug": {
+      "active": true,
+      "description": "Monitoreo y telemetria por puerto UART COM3 a 115200 baudios"
+    }
+  },
+  "expressions": [
+    {
+      "id": "IDLE",
+      "name": "Reposo (Kawaii)",
+      "description": "Expresion base en reposo con ojos detallados, pupilas dinamicas y mejillas sonrojadas",
+      "icon": "😊"
+    },
+    {
+      "id": "LISTENING",
+      "name": "Escuchando",
+      "description": "Ojos muy abiertos y ecualizador acustico animado en la parte inferior",
+      "icon": "👂"
+    },
+    {
+      "id": "THINKING",
+      "name": "Pensando",
+      "description": "Ojos mirando hacia arriba con destellos de pensamiento y sin marcos cuadrados",
+      "icon": "🧠"
+    },
+    {
+      "id": "SPEAKING",
+      "name": "Hablando",
+      "description": "Sincronizacion labial dinamica con fonemas ciclicos (O, A, E, Reposo)",
+      "icon": "🗣️"
+    },
+    {
+      "id": "HAPPY",
+      "name": "Feliz / Contento",
+      "description": "Ojos en arco estilo anime alegre y amplia sonrisa",
+      "icon": "😄"
+    },
+    {
+      "id": "ERROR",
+      "name": "Alerta / Error",
+      "description": "Ojos en espiral mareados para indicar fallas de conexion o de API",
+      "icon": "⚠️"
+    },
+    {
+      "id": "PORTAL",
+      "name": "Rescate WiFi",
+      "description": "Icono de antena inalambrica con indicacion de punto de acceso para configuracion",
+      "icon": "📡"
+    }
+  ]
+}

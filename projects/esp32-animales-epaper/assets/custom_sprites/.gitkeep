@@ -1,0 +1,4 @@
+# Coloca aquí PNGs opcionales para sobrescribir los sprites generados:
+#   <id>_a.png  (Frame A: reposo)
+#   <id>_b.png  (Frame B: acción + onomatopeya)
+# IDs válidos: perro, gato, vaca, pato, leon, oveja, sapo, elefante

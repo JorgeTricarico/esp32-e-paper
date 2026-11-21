@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "engram": {
+      "type": "local",
+      "command": [
+        "C:\\Users\\admin\\AppData\\Local\\agy\\bin\\engram.exe",
+        "mcp",
+        "--tools=agent",
+        "--project=esp32-paper"
+      ],
+      "enabled": true
+    }
+  }
+}
