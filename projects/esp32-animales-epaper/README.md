@@ -1,66 +1,108 @@
-# Libro de Animales Interactivo — ESP32-S3 e-Paper 1.54"
+# 🐾 Mi Libro de Animales — ESP32-S3 e-Paper Interactivo
 
-Juego educativo infantil para la placa **Waveshare ESP32-S3-ePaper-1.54** (`ESP32-S3-PICO-1-N8R8`, 8 MB Flash, 8 MB PSRAM OPI, pantalla 200x200 px 1-bit y códec de audio **ES8311**).
+Libro infantil interactivo autónomo para la placa **Waveshare ESP32-S3-ePaper-1.54** (`ESP32-S3`, pantalla e-Paper 200×200 1-bit `SSD1681`, códec de audio `ES8311` + amplificador `NS4150B`, 4 MB LittleFS).
 
-## Características
-- **8 animales iniciales:** `PERRO`, `GATO`, `VACA`, `PATO`, `LEÓN`, `OVEJA`, `SAPO`, `ELEFANTE`.
-- **Cero parpadeo al animar:** Al pulsar `BOOT`, reproduce el sonido por el parlante (Core 0) y anima únicamente la Zona 2 (`x=16, y=24, w=168, h=128`) mediante refresco parcial (`Frame A -> Frame B -> Frame A`), ignorando pulsaciones repetidas mientras suena.
-- **Cambio rápido de animal:** Pulsación corta de `PWR` (< 1.5 s) avanza al siguiente animal con refresco parcial (`0.3 s`), ejecutando 1 refresco completo automático cada 6 cambios para eliminar *ghosting*.
-- **Apagado y ahorro de batería:** Pulsación larga de `PWR` (>= 3 s) muestra `"¡HASTA PRONTO!"` y entra en Deep Sleep liberando `PIN_MAIN_PWR`. Tras 3 minutos de inactividad entra en Deep Sleep manteniendo el último animal en pantalla.
+Diseñado para aprender los **15 personajes**, sus **sonidos reales** y el **deletreo letra por letra** en español latinoamericano con sincronización visual en pantalla sin luz azul y consumo mínimo en Deep Sleep.
+
+<p align="center">
+  <img src="tools/cover_preview.png" alt="Portada e-Paper 200x200" width="240" />
+</p>
 
 ---
 
-## Compilar y Flashear (PlatformIO)
+## ✨ Características Principales
 
-Desde la carpeta `projects/esp32-animales-epaper/`:
+- **15 Personajes Ilustrados (2 frames cada uno: Reposo + Acción):**
+  `Perro`, `Gato`, `Vaca`, `Pato`, `León`, `Oveja`, `Sapo`, `Elefante`, `Mono`, `Caballo`, `Tigre`, `Grillo`, `Cerdo`, `Esqueleto` y `Monstruo`.
+- **Modo Deletreo Interactivo (activado por defecto):**
+  1. Reproduce el **sonido del animal** y anima el sprite a Frame B.
+  2. Subraya **letra por letra** en la pantalla e-Paper mientras pronuncia cada letra (`B` = *"be larga"*, `V` = *"ve corta"*, `W` = *"doble ve"*, `Y` = *"i griega"*).
+  3. Marca **toda la palabra** con subrayado continuo y flechas laterales `► PALABRA ◄` mientras dice el nombre completo.
+  4. Repite el **sonido del animal** al cierre y vuelve a Frame A.
+- **Audio Limpio sin Cortes ni Chasquidos:**
+  - Sesión continua de amplificador (`NS4150B`) con *soft-start* y pre-roll I2S para que la primera letra suene nítida desde el primer milisegundo.
+  - WAVs `16 kHz, 16-bit, Mono` normalizados para parlante 1W/8Ω.
+- **Portada Ilustrada en Reposo:**
+  - Al apagar con `PWR`, muestra *"¡HASTA PRONTO!"* durante 1.8 s y deja fija la portada ilustrada en la e-Paper sin consumo de batería.
+- **Actualización Inteligente (USB + OTA Exponencial):**
+  - Check-ins WiFi breves en Deep Sleep (`10 min` la primera hora → backoff exponencial `20..720 min` → apagado automático tras 14 ciclos sin updates).
+- **Studio Web Interactivo (`tools/studio_server.py`):**
+  - Simulador e-Paper en el navegador (`http://127.0.0.1:8765`) para comparar 8 fuentes de voz, velocidades independientes y estilos de pronunciación.
 
-```powershell
-# 1. Compilar el firmware
-pio run -e esp32-s3-paper
+<p align="center">
+  <img src="tools/preview_sheet.png" alt="Grilla de los 15 personajes" width="720" />
+</p>
 
-# 2. Subir el firmware al ESP32-S3
-pio run -e esp32-s3-paper -t upload
+---
 
-# 3. Subir la particion LittleFS con los audios (/sounds/*.wav)
-pio run -e esp32-s3-paper -t uploadfs
+## 🎮 Controles (2 Botones)
 
-# 4. Abrir monitor serie
-pio device monitor -b 115200
+| Botón | Acción | Comportamiento |
+| :--- | :--- | :--- |
+| **`BOOT`** (`GPIO 0`) | **Clic corto** | Reproduce el animal actual (Sonido + Deletreo + Palabra + Sonido). |
+| **`BOOT`** (`GPIO 0`) | **Mantener 3 s** | Activa / desactiva el modo deletreo (ícono `A` / `A̶` arriba a la izquierda). |
+| **`PWR`** (`GPIO 18`) | **Clic corto** | Pasa al siguiente animal (si está sonando/deletreando, **cancela al instante** y salta). |
+| **`PWR`** (`GPIO 18`) | **Mantener ~2 s** | Muestra *"¡HASTA PRONTO!"*, fija la portada en e-Paper y entra en **Deep Sleep**. |
+
+> Luego de **3 minutos** de inactividad entra automáticamente en Deep Sleep conservando la pantalla actual. Pulsa `BOOT` o `PWR` para despertar.
+
+---
+
+## 🧱 Arquitectura
+
+```text
+projects/esp32-animales-epaper/
+├── include/
+│   ├── app_state.h          # Máquina de estados pura (testeable en host)
+│   ├── audio_es8311.h       # Driver I2C/I2S ES8311 + sesión continua NS4150B
+│   ├── board_pins.h         # Pinout Waveshare ESP32-S3-ePaper-1.54
+│   ├── epd_driver.h         # Driver SPI SSD1681 16 MHz (Full + Partial)
+│   └── ota_manager.h        # Check-in OTA UDP:32320 con backoff exponencial
+├── src/
+│   ├── main.cpp             # Dual-Core FreeRTOS (Core 0: Audio | Core 1: Input/EPD)
+│   └── assets/
+│       ├── animals_gfx.h    # Bitmaps PROGMEM 1-bit + tabla ANIMALS[15]
+│       └── cover_gfx.h      # Portada 200x200 para Deep Sleep
+├── data/                    # Partición LittleFS (~3.875 MB)
+│   ├── sounds/*.wav         # 15 sonidos de animales/personajes
+│   ├── letters/*.wav        # 26 letras en voz única (gtts es-419)
+│   └── names/*.wav          # 15 nombres pausados (gtts es-419)
+├── tools/
+│   ├── flash.py             # Auto-flasheo USB (COM) o espera OTA UDP:32320
+│   ├── studio_server.py     # Servidor multi-hilo del Studio web
+│   ├── studio.html          # Interfaz web simulador e-Paper + selector de voces
+│   ├── generate_graphics.py # Generador de bitmaps 1-bit y preview_sheet.png
+│   ├── generate_cover.py    # Generador de portada 200x200 (cover_gfx.h)
+│   ├── prepare_letters.py   # Generador de letras y nombres WAV 16 kHz mono
+│   └── sprites/*.py         # Ilustraciones vectoriales 4x supersampled
+└── tests/
+    └── test_assets_and_firmware.py
 ```
 
-> **Nota de Deep Sleep:** Si la placa está dormida y no aparece el puerto USB CDC, mantén presionado `BOOT` o pulsa `RST` al iniciar el upload.
-
 ---
 
-## Reemplazar Audios Placeholder por Sonidos Reales
-
-Por defecto `tools/prepare_audio.py` genera audios sintetizados en `data/sounds/` para poder probar desde el primer minuto. Para usar sonidos reales:
-
-1. Coloca tus archivos (`.mp3`, `.wav`, `.ogg`, `.flac` o `.m4a`) en `assets/raw_audio/` con el ID del animal (`perro.mp3`, `gato.wav`, `leon.mp3`, etc.).
-2. Ejecuta:
-   ```powershell
-   python tools/prepare_audio.py
-   ```
-   El script recorta silencios iniciales, normaliza a `-3 dBFS`, recorta a máximo `2.5 s` y convierte a **WAV PCM 16 kHz, 16-bit, Mono** en `data/sounds/`.
-3. Vuelve a subir la partición de archivos:
-   ```powershell
-   pio run -e esp32-s3-paper -t uploadfs
-   ```
-
----
-
-## Personalizar Sprites o Agregar Nuevos Animales
-
-- **Sobrescribir dibujos:** Coloca `assets/custom_sprites/<id>_a.png` y `<id>_b.png` y ejecuta `python tools/generate_graphics.py`.
-- **Agregar un animal nuevo:**
-  1. Añade la tupla `(id, "NOMBRE", "¡ONOMATOPEYA!")` a `ANIMALS` en `tools/generate_graphics.py` (y su función de dibujo o PNGs en `assets/custom_sprites/`).
-  2. Añade el `id` a `ANIMAL_IDS` en `tools/prepare_audio.py`.
-  3. Ejecuta ambos scripts, revisa `tools/preview_sheet.png` y vuelve a compilar/subir firmware + `uploadfs`.
-
----
-
-## Ejecutar Pruebas (Host)
+## 🚀 Cómo Compilar, Probar y Flashear
 
 ```powershell
+cd projects\esp32-animales-epaper
+
+# 1. Ejecutar suite de verificación de assets, particiones y headers
 pytest tests/test_assets_and_firmware.py -v
+
+# 2. Compilar firmware
+pio run -e esp32-s3-paper
+
+# 3. Flashear solo firmware (detecta USB o espera check-in OTA)
+python tools/flash.py
+
+# 4. Flashear firmware + LittleFS completo (data/)
+python tools/flash.py --both
+```
+
+### Abrir el Studio Web Interactivo
+
+```powershell
+cd projects\esp32-animales-epaper
+python tools/studio_server.py
+# Abre http://127.0.0.1:8765 en tu navegador
 ```

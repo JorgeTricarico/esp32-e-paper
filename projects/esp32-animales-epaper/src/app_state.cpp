@@ -5,7 +5,7 @@ AppStateMachine::AppStateMachine(uint8_t totalAnimals)
       state(STATE_IDLE),
       currentAnimal(0),
       partialRefreshCount(0),
-      spellMode(false),
+      spellMode(true),
       audioDone(false),
       timerDone(false) {}
 
@@ -27,10 +27,12 @@ StepResult AppStateMachine::handleEvent(AppEventType evt) {
 
     switch (evt) {
         case EVT_NEXT_ANIMAL:
-            // Proteccion contra apretar rapido durante animacion o cambio
-            if (state != STATE_IDLE) {
+            // Si estaba animando/sonando, cancelar y pasar directo al siguiente animal
+            if (state == STATE_SWITCHING) {
                 return res;
             }
+            audioDone = false;
+            timerDone = false;
             state = STATE_SWITCHING;
             currentAnimal = (uint8_t)((currentAnimal + 1) % animalCount);
             partialRefreshCount++;

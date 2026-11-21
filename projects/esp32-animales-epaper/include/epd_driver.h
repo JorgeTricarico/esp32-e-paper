@@ -43,6 +43,7 @@ public:
     void drawAnimalSpriteOnly(uint8_t animalIndex, bool frameB);
     void drawLetterHighlight(uint8_t animalIndex, int8_t letterPos);
     void drawSleepScreen();
+    void drawCoverScreen();
 
     uint8_t *getBuffer() { return buffer; }
 

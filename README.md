@@ -8,10 +8,11 @@ Monorepo de firmwares para la placa **Waveshare ESP32-S3-ePaper-1.54** (ESP32-S3
 
 ```
 esp32-paper/
-├── README.md                  # Este archivo
+├── README.md                          # Este archivo
 ├── projects/
-│   ├── copito/                # Asistente de voz autónomo con IA (Gemini + TTS + e-Paper)
-│   └── _template/             # Plantilla base lista para clonar y crear nuevos proyectos
+│   ├── esp32-animales-epaper/         # Libro infantil interactivo (15 personajes, voz y deletreo)
+│   ├── copito/                        # Asistente de voz autónomo con IA (Gemini + TTS + e-Paper)
+│   └── _template/                     # Plantilla base lista para clonar con OTA exponencial
 └── ...
 ```
 
@@ -21,8 +22,9 @@ esp32-paper/
 
 | Proyecto | Ruta | Descripción |
 | :--- | :--- | :--- |
+| **Libro de Animales** | [`projects/esp32-animales-epaper/`](projects/esp32-animales-epaper/README.md) | Libro educativo interactivo de 15 personajes con sonidos reales, deletreo sincronizado en e-Paper, portada en reposo y Studio web. |
 | **Copito AI** | [`projects/copito/`](projects/copito/README.md) | Asistente de voz autónomo con rostro expresivo en e-Paper, Gemini AI, streaming TTS, reloj, clima, cuentos y portal cautivo OTA. |
-| **Plantilla Base** | [`projects/_template/`](projects/_template/README.md) | Skeleton mínimo con la configuración de PlatformIO, particiones y pinout de la placa Waveshare ESP32-S3-ePaper-1.54. |
+| **Plantilla Base** | [`projects/_template/`](projects/_template/README.md) | Skeleton mínimo con la configuración de PlatformIO, particiones, pinout y OTA exponencial de la placa Waveshare ESP32-S3-ePaper-1.54. |
 
 ---
 

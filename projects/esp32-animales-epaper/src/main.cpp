@@ -20,6 +20,7 @@ static QueueHandle_t s_eventQueue = nullptr;
 static QueueHandle_t s_audioQueue = nullptr;
 static SemaphoreHandle_t s_epdReadySem = nullptr;
 static volatile bool s_abortAudio = false;
+static volatile bool s_sleepRequested = false;
 
 struct AppEventMsg {
     AppEventType type;
@@ -34,6 +35,15 @@ struct AudioCmd {
 static inline bool sendAppEvent(AppEventType type, int8_t letterIdx = -1, TickType_t waitTicks = 0) {
     AppEventMsg msg = {type, letterIdx};
     return (xQueueSend(s_eventQueue, &msg, waitTicks) == pdTRUE);
+}
+
+static void abortableDelayMs(uint32_t ms) {
+    uint32_t elapsed = 0;
+    while (elapsed < ms && !s_abortAudio) {
+        uint32_t step = (ms - elapsed > 15) ? 15 : (ms - elapsed);
+        vTaskDelay(pdMS_TO_TICKS(step));
+        elapsed += step;
+    }
 }
 
 static uint8_t sampleBatteryLevel() {
@@ -53,11 +63,16 @@ static uint8_t sampleBatteryLevel() {
 static void enterDeepSleep(bool drawSleepMsg) {
     log_i("Entrando en Deep Sleep (drawSleepMsg=%d)...", drawSleepMsg);
 
+    s_sleepRequested = true;
     s_abortAudio = true;
     audio.requestAbort();
+    if (s_epdReadySem) xSemaphoreGive(s_epdReadySem);
 
     if (drawSleepMsg) {
         epd.drawSleepScreen();
+        epd.displayFull();
+        vTaskDelay(pdMS_TO_TICKS(1800));
+        epd.drawCoverScreen();
         epd.displayFull();
     }
 
@@ -106,6 +121,10 @@ static void taskAudio(void *pvParameters) {
     AudioCmd cmd;
     while (true) {
         if (xQueueReceive(s_audioQueue, &cmd, portMAX_DELAY) == pdTRUE) {
+            if (!s_sleepRequested) {
+                s_abortAudio = false;
+                audio.clearAbort();
+            }
             if (cmd.animalIndex < ANIMAL_COUNT && !s_abortAudio) {
                 const AnimalAsset &asset = ANIMALS[cmd.animalIndex];
                 log_i("Reproduciendo %s...", asset.audio_path);
@@ -117,7 +136,7 @@ static void taskAudio(void *pvParameters) {
                 audio.playWavFile(asset.audio_path);
 
                 if (cmd.spellLetters && !s_abortAudio) {
-                    vTaskDelay(pdMS_TO_TICKS(220));
+                    abortableDelayMs(220);
                     for (uint8_t i = 0; i < asset.letter_count && !s_abortAudio; i++) {
                         char letterPath[32];
                         snprintf(letterPath, sizeof(letterPath), "/letters/%c.wav", asset.letter_keys[i]);
@@ -128,9 +147,10 @@ static void taskAudio(void *pvParameters) {
                         if (s_epdReadySem) xSemaphoreTake(s_epdReadySem, 0);
                         sendAppEvent(EVT_SPELL_LETTER, (int8_t)i, portMAX_DELAY);
                         if (s_epdReadySem) xSemaphoreTake(s_epdReadySem, pdMS_TO_TICKS(600));
+                        if (s_abortAudio) break;
 
                         if (audio.playWavFile(letterPath) > 0 && !s_abortAudio) {
-                            vTaskDelay(pdMS_TO_TICKS(50));
+                            abortableDelayMs(50);
                         }
                     }
                     if (!s_abortAudio) {
@@ -138,20 +158,22 @@ static void taskAudio(void *pvParameters) {
                         if (s_epdReadySem) xSemaphoreTake(s_epdReadySem, 0);
                         sendAppEvent(EVT_SPELL_LETTER, -2, portMAX_DELAY);
                         if (s_epdReadySem) xSemaphoreTake(s_epdReadySem, pdMS_TO_TICKS(600));
-
-                        vTaskDelay(pdMS_TO_TICKS(80));
-                        char namePath[32];
-                        snprintf(namePath, sizeof(namePath), "/names/%s.wav", asset.id);
-                        audio.playWavFile(namePath);
+                        if (!s_abortAudio) {
+                            abortableDelayMs(80);
+                            char namePath[32];
+                            snprintf(namePath, sizeof(namePath), "/names/%s.wav", asset.id);
+                            audio.playWavFile(namePath);
+                        }
 
                         // Limpiar resaltado y repetir el sonido del animal al terminar la palabra
                         if (!s_abortAudio) {
                             if (s_epdReadySem) xSemaphoreTake(s_epdReadySem, 0);
                             sendAppEvent(EVT_SPELL_LETTER, -1, portMAX_DELAY);
                             if (s_epdReadySem) xSemaphoreTake(s_epdReadySem, pdMS_TO_TICKS(600));
-
-                            vTaskDelay(pdMS_TO_TICKS(140));
-                            audio.playWavFile(asset.audio_path);
+                            if (!s_abortAudio) {
+                                abortableDelayMs(140);
+                                audio.playWavFile(asset.audio_path);
+                            }
                         }
                     }
                     audio.endSession();
@@ -224,6 +246,13 @@ static void taskDisplay(void *pvParameters) {
                     xSemaphoreGive(s_epdReadySem);
                 }
                 continue;
+            }
+
+            if (evt == EVT_NEXT_ANIMAL && fsm.getState() == STATE_ANIMATING) {
+                // Cancelar de inmediato el audio/deletreo en curso para pasar al siguiente animal
+                s_abortAudio = true;
+                audio.requestAbort();
+                if (s_epdReadySem) xSemaphoreGive(s_epdReadySem);
             }
 
             StepResult res = fsm.handleEvent(evt);

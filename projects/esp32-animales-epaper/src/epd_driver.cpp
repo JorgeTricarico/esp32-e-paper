@@ -1,5 +1,6 @@
 #include "epd_driver.h"
 #include "assets/animals_gfx.h"
+#include "assets/cover_gfx.h"
 #include <SPI.h>
 
 // ==============================================================================
@@ -51,7 +52,7 @@ static const uint8_t WF_PARTIAL_1IN54_0[159] = {
 
 EpdDriver epd;
 
-EpdDriver::EpdDriver() : buffer(nullptr), isPartialReady(false), batteryLevel(3), spellModeEnabled(false) {}
+EpdDriver::EpdDriver() : buffer(nullptr), isPartialReady(false), batteryLevel(3), spellModeEnabled(true) {}
 
 EpdDriver::~EpdDriver() {
     if (buffer) {
@@ -468,21 +469,28 @@ void EpdDriver::drawLetterHighlight(uint8_t animalIndex, int8_t letterPos) {
         drawHLine(x0, x1, 195, true);
         drawHLine(x0, x1, 196, true);
     } else if (letterPos == -2 && asset.letter_count > 0) {
-        // Resaltar toda la palabra completa al decir el nombre entero
+        // Subrayar toda la palabra completa y dibujar puntas de flecha ► / ◄ a los costados
         int x0 = asset.letter_x[0] - 2;
         int last = asset.letter_count - 1;
         int x1 = asset.letter_x[last] + asset.letter_w[last] + 1;
         if (x0 < 2) x0 = 2;
         if (x1 > EPD_WIDTH - 3) x1 = EPD_WIDTH - 3;
-        drawHLine(x0, x1, 193, true);
+
+        // Subrayado grueso continuo debajo de toda la palabra
         drawHLine(x0, x1, 194, true);
         drawHLine(x0, x1, 195, true);
         drawHLine(x0, x1, 196, true);
-        for (int y = 190; y <= 196; y++) {
-            setPixel(x0, y, true);
-            setPixel(x0 + 1, y, true);
-            setPixel(x1 - 1, y, true);
-            setPixel(x1, y, true);
+
+        // Flechitas a los costados apuntando a la palabra (y=170..180, centro y=175)
+        const int cy = 175;
+        for (int d = 0; d <= 4; d++) {
+            int half = 4 - d;
+            int lx = x0 - 6 + d;
+            int rx = x1 + 6 - d;
+            for (int dy = -half; dy <= half; dy++) {
+                if (lx >= 2) setPixel(lx, cy + dy, true);
+                if (rx <= EPD_WIDTH - 3) setPixel(rx, cy + dy, true);
+            }
         }
     }
 }
@@ -501,6 +509,10 @@ void EpdDriver::drawAnimalScreen(uint8_t animalIndex, bool frameB) {
     drawAnimalSpriteOnly(animalIndex, frameB);
     drawHLine(16, 183, 154, true);
     drawBitmap1Bit(0, GFX_ZONE3_Y, GFX_ZONE3_W, GFX_ZONE3_H, ANIMALS[animalIndex].name_bitmap);
+}
+
+void EpdDriver::drawCoverScreen() {
+    drawBitmap1Bit(0, 0, EPD_WIDTH, EPD_HEIGHT, gfx_cover);
 }
 
 void EpdDriver::drawSleepScreen() {
